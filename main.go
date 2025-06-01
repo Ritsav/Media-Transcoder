@@ -2,7 +2,7 @@ package main
 
 import (
 	"log"
-	"media_transcoder/tasks"
+	"media_transcoder/handlers"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -13,8 +13,7 @@ func main() {
 	router := mux.NewRouter()
 
 	// Endpoints for queuing a new task to the backend
-	router.HandleFunc("/upload-video", tasks.UploadVideoHandler)
-	router.HandleFunc("/upload-audio", tasks.UploadAudioHandler)
+	router.HandleFunc("/upload", handlers.UploadHandler)
 
 	log.Fatal(http.ListenAndServe(port, router))
 }
