@@ -1,6 +1,6 @@
 package models
 
 type Format struct {
-	FileType         string `json:"fileType"`
+	MediaType        string `json:"mediaType"`
 	RequiredFileType string `json:"requiredFileType"`
 }

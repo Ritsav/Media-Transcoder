@@ -47,7 +47,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Running the appropriate command for conversion of file format
 	outFile := fmt.Sprintf("%s/output.%s", uploadDir, format.RequiredFileType)
-	err = services.FileFormatConversion(dstPath, outFile)
+	err = services.FileFormatConversion(dstPath, outFile, format)
 	if err != nil {
 		http.Error(w, "error running command", http.StatusInternalServerError)
 		log.Println(err)
