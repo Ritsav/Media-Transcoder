@@ -2,9 +2,10 @@ package services
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
-	"media_transcoder/models"
+	"media_transcoder/dto"
 	"mime/multipart"
 	"os"
 	"os/exec"
@@ -32,27 +33,25 @@ const (
 	AUDIO_FLAC
 	AUDIO_AAC
 	AUDIO_ALAC
+
+	// Invalid TYPE
+	INVALID_TYPE
 )
 
-func determineConversionType(format models.Format) ConversionType {
-	switch {
-	case format.MediaType == "video" && format.RequiredFileType == "wav":
-		return ConversionType(VIDEO_WAV)
-
-	default:
-		return ConversionType(VIDEO_MP3)
-	}
-}
-
-func UnMarshelFormData(jsonStr string) (models.Format, error) {
-	var format models.Format
+// TODO: Look into unmarshaling enum type (video/audio ONLY)
+func UnMarshelFormData(jsonStr string) (dto.Format, error) {
+	var format dto.Format
 	err := json.Unmarshal([]byte(jsonStr), &format)
 	log.Println("Format: \nFile Type:", format.MediaType, "\nRequired File Type:", format.RequiredFileType)
 	return format, err
 }
 
-func FileFormatConversion(dstPath string, outFile string, format models.Format) error {
+func FileFormatConversion(dstPath string, outFile string, format dto.Format) error {
+	// Check Conversion Type
 	conversionType := determineConversionType(format)
+	if conversionType == INVALID_TYPE {
+		return errors.New("invalid conversion type")
+	}
 
 	// Try Remuxing first
 	cmd := exec.Command("ffmpeg", "-y", "-i", dstPath, "-c", "copy", outFile)
@@ -67,11 +66,10 @@ func FileFormatConversion(dstPath string, outFile string, format models.Format) 
 		return nil
 	}
 
-	log.Println("Remuxing failed, trying to re-encode:", err)
-
 	// Do Re-encoding if remuxing fails
-	// cmd = exec.Command("ffmpeg", "-i", dstPath, "-c:v", "libx264", "-c:a", "aac", outFile, "-y")
-	*cmd = ChooseCommand(dstPath, outFile, conversionType, format.MediaType)
+	log.Println("Remuxing failed, trying to re-encode:", err)
+	*cmd = chooseCommand(dstPath, outFile, conversionType, format.MediaType)
+
 	err = cmd.Start()
 	if err != nil {
 		return err
@@ -107,49 +105,105 @@ func UploadFileToDir(uploadDir string, filename string, file multipart.File) (st
 // Add a ENUM BitrateLevels
 // 1. Bitrate wise: 96k(OPUS: Great for low bitrate), 128k, 192k, 320k
 // 2. Variable quality from 0-10 (5 being ~128-160kbps)
-func ChooseCommand(dstFile string, outFile string, conversionType ConversionType, mediaType string) exec.Cmd {
-	var media, codec, setBitrate, bitrate string
-	switch mediaType {
-	case "video":
-		media = "-vn"
+// 3. Improve function to not let empty string return as command
+func chooseCommand(dstFile string, outFile string, conversionType ConversionType, mediaType string) exec.Cmd {
+	var args []string
+	// Append necessary args
+	args = append(args, "-y", "-i", dstFile)
 
-	default:
-		media = ""
+	// Check if we should add media or not
+	if mediaType == "video" {
+		args = append(args, "-vn")
 	}
+	args = append(args, "-c:a")
 
 	switch conversionType {
 	case VIDEO_WAV, AUDIO_WAV:
-		codec = "pcm_s16le"
+		args = append(args, "pcm_s16le")
 
 	case VIDEO_FLAC, AUDIO_FLAC:
-		codec = "flac"
+		args = append(args, "flac")
 
 	case VIDEO_ALAC, AUDIO_ALAC:
-		codec = "alac"
+		args = append(args, "alac")
 
 	case VIDEO_OGG, AUDIO_OGG:
-		codec = "libvorbis"
-		setBitrate = "-q:a"
-		bitrate = "5"
+		args = append(args, "libvorbis", "-q:a", "5")
 
 	case VIDEO_MP3, AUDIO_MP3:
-		codec = "libmp3lame"
-		setBitrate = "-b:a"
-		bitrate = "192k"
+		args = append(args, "libmp3lame", "-b:a", "192k")
 
 	case VIDEO_AAC, AUDIO_AAC:
-		codec = "aac"
-		setBitrate = "-b:a"
-		bitrate = "192k"
+		args = append(args, "aac", "-b:a", "192k")
 
 	case VIDEO_OPUS, AUDIO_OPUS:
-		codec = "libopus"
-		setBitrate = "-b:a"
-		bitrate = "96k"
+		args = append(args, "libopus", "-b:a", "96k")
 
 	default:
-		return *exec.Command("ffmpeg", "-i", dstFile, outFile, "-y")
+		args = []string{"-i", "-y", dstFile, outFile}
+		return *exec.Command("ffmpeg", args...)
 	}
 
-	return *exec.Command("ffmpeg", "-y", "-i", dstFile, media, "-c:a", codec, setBitrate, bitrate, outFile)
+	args = append(args, outFile)
+	return *exec.Command("ffmpeg", args...)
+}
+
+func determineConversionType(format dto.Format) ConversionType {
+	var conversionType ConversionType
+
+	if format.MediaType == "video" {
+		switch format.RequiredFileType {
+		case "wav":
+			conversionType = VIDEO_WAV
+
+		case "mp3":
+			conversionType = VIDEO_MP3
+
+		case "ogg":
+			conversionType = VIDEO_OGG
+
+		case "opus":
+			conversionType = VIDEO_OPUS
+
+		case "flac":
+			conversionType = VIDEO_FLAC
+
+		case "aac":
+			conversionType = VIDEO_AAC
+
+		case "alac":
+			conversionType = VIDEO_ALAC
+
+		default:
+			conversionType = INVALID_TYPE
+		}
+	} else {
+		switch format.RequiredFileType {
+		case "wav":
+			conversionType = AUDIO_WAV
+
+		case "mp3":
+			conversionType = AUDIO_MP3
+
+		case "ogg":
+			conversionType = AUDIO_OGG
+
+		case "opus":
+			conversionType = AUDIO_OPUS
+
+		case "flac":
+			conversionType = AUDIO_FLAC
+
+		case "aac":
+			conversionType = AUDIO_AAC
+
+		case "alac":
+			conversionType = AUDIO_ALAC
+
+		default:
+			conversionType = INVALID_TYPE
+		}
+	}
+
+	return conversionType
 }
