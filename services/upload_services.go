@@ -30,7 +30,7 @@ const (
 	AUDIO_OGG
 	AUDIO_OPUS
 	AUDIO_FLAC
-	AUDIO_ACC
+	AUDIO_AAC
 	AUDIO_ALAC
 )
 
@@ -71,7 +71,7 @@ func FileFormatConversion(dstPath string, outFile string, format models.Format) 
 
 	// Do Re-encoding if remuxing fails
 	// cmd = exec.Command("ffmpeg", "-i", dstPath, "-c:v", "libx264", "-c:a", "aac", outFile, "-y")
-	*cmd = CommandChoose(dstPath, outFile, conversionType)
+	*cmd = ChooseCommand(dstPath, outFile, conversionType, format.MediaType)
 	err = cmd.Start()
 	if err != nil {
 		return err
@@ -104,53 +104,52 @@ func UploadFileToDir(uploadDir string, filename string, file multipart.File) (st
 }
 
 // TODO: AUDIO QUALITY level set:
+// Add a ENUM BitrateLevels
 // 1. Bitrate wise: 96k(OPUS: Great for low bitrate), 128k, 192k, 320k
 // 2. Variable quality from 0-10 (5 being ~128-160kbps)
-func CommandChoose(dstFile string, outFile string, conversionType ConversionType) exec.Cmd {
+func ChooseCommand(dstFile string, outFile string, conversionType ConversionType, mediaType string) exec.Cmd {
+	var media, codec, setBitrate, bitrate string
+	switch mediaType {
+	case "video":
+		media = "-vn"
+
+	default:
+		media = ""
+	}
+
 	switch conversionType {
-	case VIDEO_WAV:
-		return *exec.Command("ffmpeg", "-y", "-i", dstFile, "-vn", "-c:a", "pcm_s16le", outFile)
+	case VIDEO_WAV, AUDIO_WAV:
+		codec = "pcm_s16le"
 
-	case VIDEO_MP3:
-		return *exec.Command("ffmpeg", "-y", "-i", dstFile, "-vn", "-c:a", "libmp3lame", "-b:a", "192k", outFile)
+	case VIDEO_FLAC, AUDIO_FLAC:
+		codec = "flac"
 
-	case VIDEO_AAC:
-		return *exec.Command("ffmpeg", "-y", "-i", dstFile, "-vn", "-c:a", "aac", "-b:a", "192k", outFile)
+	case VIDEO_ALAC, AUDIO_ALAC:
+		codec = "alac"
 
-	case VIDEO_OGG:
-		return *exec.Command("ffmpeg", "-y", "-i", dstFile, "-vn", "-c:a", "libvorbis", "-q:a", "5", outFile)
+	case VIDEO_OGG, AUDIO_OGG:
+		codec = "libvorbis"
+		setBitrate = "-q:a"
+		bitrate = "5"
 
-	case VIDEO_OPUS:
-		return *exec.Command("ffmpeg", "-y", "-i", dstFile, "-vn", "-c:a", "libopus", "-b:a", "96k", outFile)
+	case VIDEO_MP3, AUDIO_MP3:
+		codec = "libmp3lame"
+		setBitrate = "-b:a"
+		bitrate = "192k"
 
-	case VIDEO_FLAC:
-		return *exec.Command("ffmpeg", "-y", "-i", dstFile, "-vn", "-c:a", "flac", outFile)
+	case VIDEO_AAC, AUDIO_AAC:
+		codec = "aac"
+		setBitrate = "-b:a"
+		bitrate = "192k"
 
-	case VIDEO_ALAC:
-		return *exec.Command("ffmpeg", "-y", "-i", dstFile, "-vn", "-c:a", "alac", outFile)
-
-	case AUDIO_WAV:
-		return *exec.Command("ffmpeg", "-y", "-i", dstFile, "-c:a", "pcm_s16le", outFile)
-
-	case AUDIO_MP3:
-		return *exec.Command("ffmpeg", "-y", "-i", dstFile, "-c:a", "libmp3lame", "-b:a", "192k", outFile)
-
-	case AUDIO_ACC:
-		return *exec.Command("ffmpeg", "-y", "-i", dstFile, "-c:a", "aac", "-b:a", "192k", outFile)
-
-	case AUDIO_OGG:
-		return *exec.Command("ffmpeg", "-y", "-i", dstFile, "-c:a", "libvorbis", "-q:a", "5", outFile)
-
-	case AUDIO_OPUS:
-		return *exec.Command("ffmpeg", "-y", "-i", dstFile, "-c:a", "libopus", "-b:a", "96k", outFile)
-
-	case AUDIO_FLAC:
-		return *exec.Command("ffmpeg", "-y", "-i", dstFile, "-c:a", "flac", outFile)
-
-	case AUDIO_ALAC:
-		return *exec.Command("ffmpeg", "-y", "-i", dstFile, "-c:a", "alac", outFile)
+	case VIDEO_OPUS, AUDIO_OPUS:
+		codec = "libopus"
+		setBitrate = "-b:a"
+		bitrate = "96k"
 
 	default:
 		return *exec.Command("ffmpeg", "-i", dstFile, outFile, "-y")
 	}
+
+	return *exec.Command("ffmpeg", "-y", "-i", dstFile, media, "-c:a", codec, setBitrate, bitrate, outFile)
 }
