@@ -15,6 +15,7 @@ import (
 // ENUM
 type ConversionType int
 
+// TODO: Add video --> video conversions
 const (
 	// Video --> Audio Conversions
 	VIDEO_WAV  ConversionType = iota // Lossy, compressed -- .wav
@@ -34,8 +35,10 @@ const (
 	AUDIO_AAC
 	AUDIO_ALAC
 
+	// Video --> Video Conversions
+
 	// Invalid TYPE
-	INVALID_TYPE
+	INVALID_TYPE = -1
 )
 
 // TODO: Look into unmarshaling enum type (video/audio ONLY)
@@ -47,30 +50,38 @@ func UnMarshelFormData(jsonStr string) (dto.Format, error) {
 }
 
 func FileFormatConversion(dstPath string, outFile string, format dto.Format) error {
+	var remux_flag bool
 	// Check Conversion Type
 	conversionType := determineConversionType(format)
 	if conversionType == INVALID_TYPE {
 		return errors.New("invalid conversion type")
 	}
 
-	// Try Remuxing first
-	cmd := exec.Command("ffmpeg", "-y", "-i", dstPath, "-c", "copy", outFile)
+	// Only Allowing Remuxing when it is from similar format --> similar format (eg: audio --> audio)
+	if conversionType > 6 {
+		remux_flag = true
+	}
+
+	// Try Remuxing first if it is necessary
+	if remux_flag {
+		cmd := exec.Command("ffmpeg", "-y", "-i", dstPath, "-c", "copy", outFile)
+		err := cmd.Start()
+		if err != nil {
+			return err
+		}
+		log.Println("Waiting for command to finish...")
+		err = cmd.Wait()
+		if err == nil {
+			log.Println("Command finished")
+			return nil
+		} else {
+			log.Println("Remuxing failed, trying to re-encode:", err)
+		}
+	}
+
+	// Do Re-encoding if remuxing fails or is not necessary
+	cmd := chooseCommand(dstPath, outFile, conversionType, format.MediaType)
 	err := cmd.Start()
-	if err != nil {
-		return err
-	}
-	log.Println("Waiting for command to finish...")
-	err = cmd.Wait()
-	if err == nil {
-		log.Println("Command finished")
-		return nil
-	}
-
-	// Do Re-encoding if remuxing fails
-	log.Println("Remuxing failed, trying to re-encode:", err)
-	*cmd = chooseCommand(dstPath, outFile, conversionType, format.MediaType)
-
-	err = cmd.Start()
 	if err != nil {
 		return err
 	}
