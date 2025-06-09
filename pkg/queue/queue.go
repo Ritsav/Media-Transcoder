@@ -2,6 +2,14 @@ package queue
 
 import "media_transcoder/dto"
 
+// Static hasChanged status & queueStatus slice
+// Reasoning: Implemented to reduce multiple status checks and form a cache-like mechanism using
+// slice queueStatus to reduce the number of traversals needed through the queue
+// Queue traversal for status check works on O(n) time so its inefficient
+// to traverse again and again if nothing has changed
+var hasChanged bool
+var queueStatus []*QueueNode
+
 type Queue struct {
 	front *QueueNode
 	rear  *QueueNode
@@ -31,6 +39,9 @@ func (queue *Queue) Enqueue(filename string, data dto.Format) {
 	// Normal condition
 	queue.rear.next = newNode
 	queue.rear = newNode
+
+	// Update queue status
+	queue.changeStatus()
 }
 
 // This returns the data of the file to be processed
@@ -38,12 +49,41 @@ func (queue *Queue) Dequeue() *QueueNode {
 	returnNode := queue.front
 	queue.front = queue.front.next
 
+	// Update queue status
+	queue.changeStatus()
 	return returnNode
 }
 
-func (queue *Queue) Status() {
+// Returns the current queueStatus
+func (queue *Queue) Status() []*QueueNode {
+	if !queue.getStatus() {
+		return queueStatus
+	}
+
+	// Traverse the queue and get queueStatus
+	tmp := queue.front
+	for tmp != queue.rear {
+		queueStatus = append(queueStatus, tmp)
+		tmp = tmp.next
+	}
+	// Append the queue.rear in queueStatus
+	queueStatus = append(queueStatus, tmp)
+
+	return queueStatus
 }
 
-// HasChanged should be a bool that must be toggled on any task completion?
-// Required for increasing efficiency of queue status
-// func (queue *Queue) HasChanged() {}
+// Static variable hasChanged(bool) functions
+// hasChanged bool toggler function to set to true on queue status change
+func (queue *Queue) changeStatus() {
+	hasChanged = true
+}
+
+// hasChanged bool checker function
+func (queue *Queue) getStatus() bool {
+	// Save hasChanged in currentStatus to return present state as its being changed in func
+	currentStatus := hasChanged
+
+	// sets hasChanged to false to notify checked for the current instance unless queue is updated
+	hasChanged = false
+	return currentStatus
+}
