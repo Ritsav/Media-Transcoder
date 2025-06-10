@@ -60,6 +60,9 @@ func (queue *Queue) Status() []*QueueNode {
 		return queueStatus
 	}
 
+	// Resetting the queueStatus for making room for new queueStat
+	queueStatus = nil
+
 	// Traverse the queue and get queueStatus
 	tmp := queue.front
 	for tmp != queue.rear {
