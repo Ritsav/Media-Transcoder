@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"encoding/json"
 	"media_transcoder/dto"
 	"sync"
 )
@@ -11,7 +12,7 @@ import (
 // Queue traversal for status check works on O(n) time so its inefficient
 // to traverse again and again if nothing has changed
 var hasChanged bool
-var queueStatus []*QueueNode
+var queueMap map[int]json.RawMessage
 
 type Queue struct {
 	front *QueueNode
@@ -23,6 +24,15 @@ type QueueNode struct {
 	filename string
 	data     dto.Format
 	next     *QueueNode
+}
+
+func (queueNode QueueNode) MarshalQueueNode() ([]byte, error) {
+	dataJson, _ := json.Marshal(queueNode.data)
+
+	return json.Marshal(map[string]any{
+		"filename": queueNode.filename,
+		"data":     json.RawMessage(dataJson),
+	})
 }
 
 // QueueNode Functions
@@ -65,27 +75,36 @@ func (queue *Queue) Dequeue() *QueueNode {
 }
 
 // Returns the current queueStatus
-func (queue *Queue) Status() []*QueueNode {
+func (queue *Queue) Status() map[int]json.RawMessage {
 	queue.lock.Lock()
 	defer queue.lock.Unlock()
 
 	if !queue.getStatus() {
-		return queueStatus
+		return queueMap
 	}
 
-	// Resetting the queueStatus for making room for new queueStat
-	queueStatus = nil
+	// Resetting the queueMap for making room for new queueMap
+	queueMap = nil
+	queueMap = make(map[int]json.RawMessage)
 
-	// Traverse the queue and get queueStatus
+	// Setup a counter to count queue
+	counter := 1
+
+	// Traverse the queue and get queueMap
 	tmp := queue.front
 	for tmp != queue.rear {
-		queueStatus = append(queueStatus, tmp)
-		tmp = tmp.next
-	}
-	// Append the queue.rear in queueStatus
-	queueStatus = append(queueStatus, tmp)
+		// Marshalled tmp value
+		tmpJson, _ := tmp.MarshalQueueNode()
 
-	return queueStatus
+		queueMap[counter] = tmpJson
+		tmp = tmp.next
+		counter++
+	}
+	// Append the queue.rear in queueMap
+	tmpJson, _ := tmp.MarshalQueueNode()
+	queueMap[counter] = tmpJson
+
+	return queueMap
 }
 
 // Below private functions do not need to have locks and unlocks

@@ -13,8 +13,8 @@ func main() {
 	router := mux.NewRouter()
 
 	// Endpoints for queuing a new task to the backend
-	// TODO: Add queueing logic to upload
-	router.HandleFunc("/upload", handlers.UploadHandler)
+	router.HandleFunc("/upload", handlers.UploadHandler).Methods("POST")
+	router.HandleFunc("/status", handlers.StatusHandler).Methods("GET")
 
 	log.Fatal(http.ListenAndServe(port, router))
 }
