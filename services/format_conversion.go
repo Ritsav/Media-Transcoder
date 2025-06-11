@@ -1,15 +1,10 @@
 package services
 
 import (
-	"encoding/json"
 	"errors"
-	"io"
 	"log"
 	"media_transcoder/dto"
-	"mime/multipart"
-	"os"
 	"os/exec"
-	"path/filepath"
 )
 
 // ENUM
@@ -40,14 +35,6 @@ const (
 	// Invalid TYPE
 	INVALID_TYPE = -1
 )
-
-// TODO: Look into unmarshaling enum type (video/audio ONLY)
-func UnMarshelFormData(jsonStr string) (dto.Format, error) {
-	var format dto.Format
-	err := json.Unmarshal([]byte(jsonStr), &format)
-	log.Println("Format: \nFile Type:", format.MediaType, "\nRequired File Type:", format.RequiredFileType)
-	return format, err
-}
 
 func FileFormatConversion(dstPath string, outFile string, format dto.Format) error {
 	var remux_flag bool
@@ -92,24 +79,6 @@ func FileFormatConversion(dstPath string, outFile string, format dto.Format) err
 	}
 	log.Println("Command finished, err:", err)
 	return nil
-}
-
-func UploadFileToDir(uploadDir string, filename string, file multipart.File) (string, error) {
-	os.MkdirAll(uploadDir, os.ModePerm)
-	dstPath := filepath.Join(uploadDir, filename)
-
-	dst, err := os.Create(dstPath)
-	if err != nil {
-		log.Println("error creating file", err)
-		return dstPath, err
-	}
-	defer dst.Close()
-
-	_, err = io.Copy(dst, file)
-	if err != nil {
-		return dstPath, err
-	}
-	return dstPath, nil
 }
 
 // TODO: AUDIO QUALITY level set:
