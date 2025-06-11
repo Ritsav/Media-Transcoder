@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"media_transcoder/dto"
+	"media_transcoder/pkg/global"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -27,9 +28,6 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid JSON", http.StatusBadRequest)
 		return
 	}
-
-	// IMPORTANT: Temp addon for var declaration usage remove on queue commit
-	log.Println(format)
 
 	// Parsing video File upto 100 MB in memory and remaining memory is stored in disk
 	if err := r.ParseMultipartForm(100 << 20); err != nil { // << does leftshift 20 times
@@ -53,9 +51,10 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Printf("Uploaded File with filename: %s\n", handler.Filename)
 
-	// TODO: Make queue thread-safe
 	// Upload handler queues the file conversion process
-	// queue.Enqueue(handler.Filename, format)
+	go global.TaskQueue.Enqueue(handler.Filename, format)
+
+	// TODO: Refactor this file conversion functionality elsewhere
 	// outFile := fmt.Sprintf("%s/output.%s", uploadDir, format.RequiredFileType)
 	// err = services.FileFormatConversion(dstPath, outFile, format)
 	// if err != nil {
