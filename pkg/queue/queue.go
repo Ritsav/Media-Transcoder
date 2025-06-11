@@ -88,20 +88,18 @@ func (queue *Queue) Status() []*QueueNode {
 	return queueStatus
 }
 
+// Below private functions do not need to have locks and unlocks
+// because their calling function implement it already
+// Adding locks to below functions keeps them in a perpetual lock state
+
 // Static variable hasChanged(bool) functions
 // hasChanged bool toggler function to set to true on queue status change
 func (queue *Queue) changeStatus() {
-	queue.lock.Lock()
-	defer queue.lock.Unlock()
-
 	hasChanged = true
 }
 
 // hasChanged bool checker function
 func (queue *Queue) getStatus() bool {
-	queue.lock.Lock()
-	defer queue.lock.Unlock()
-
 	// Save hasChanged in currentStatus to return present state as its being changed in func
 	currentStatus := hasChanged
 
