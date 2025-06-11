@@ -1,6 +1,9 @@
 package queue
 
-import "media_transcoder/dto"
+import (
+	"media_transcoder/dto"
+	"sync"
+)
 
 // Static hasChanged status & queueStatus slice
 // Reasoning: Implemented to reduce multiple status checks and form a cache-like mechanism using
@@ -13,6 +16,7 @@ var queueStatus []*QueueNode
 type Queue struct {
 	front *QueueNode
 	rear  *QueueNode
+	lock  sync.Mutex
 }
 
 type QueueNode struct {
@@ -28,6 +32,9 @@ func initQueueNode(filename string, data dto.Format) *QueueNode {
 
 // Queue Functions
 func (queue *Queue) Enqueue(filename string, data dto.Format) {
+	queue.lock.Lock()
+	defer queue.lock.Unlock()
+
 	newNode := initQueueNode(filename, data)
 
 	// For underflow condition
@@ -46,6 +53,9 @@ func (queue *Queue) Enqueue(filename string, data dto.Format) {
 
 // This returns the data of the file to be processed
 func (queue *Queue) Dequeue() *QueueNode {
+	queue.lock.Lock()
+	defer queue.lock.Unlock()
+
 	returnNode := queue.front
 	queue.front = queue.front.next
 
@@ -56,6 +66,9 @@ func (queue *Queue) Dequeue() *QueueNode {
 
 // Returns the current queueStatus
 func (queue *Queue) Status() []*QueueNode {
+	queue.lock.Lock()
+	defer queue.lock.Unlock()
+
 	if !queue.getStatus() {
 		return queueStatus
 	}
@@ -78,11 +91,17 @@ func (queue *Queue) Status() []*QueueNode {
 // Static variable hasChanged(bool) functions
 // hasChanged bool toggler function to set to true on queue status change
 func (queue *Queue) changeStatus() {
+	queue.lock.Lock()
+	defer queue.lock.Unlock()
+
 	hasChanged = true
 }
 
 // hasChanged bool checker function
 func (queue *Queue) getStatus() bool {
+	queue.lock.Lock()
+	defer queue.lock.Unlock()
+
 	// Save hasChanged in currentStatus to return present state as its being changed in func
 	currentStatus := hasChanged
 
