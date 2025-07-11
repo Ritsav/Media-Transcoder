@@ -37,7 +37,7 @@ func (queueNode QueueNode) MarshalQueueNode() ([]byte, error) {
 
 // QueueNode Functions
 func initQueueNode(filename string, data dto.Format) *QueueNode {
-	return &QueueNode{filename: filename, data: data, next: nil}
+	return &QueueNode{filename, data, nil}
 }
 
 // Queue Functions
